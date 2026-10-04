@@ -1,7 +1,6 @@
 # t3codes-kubenix
 
-[T3 Code](https://t3.codes) agent nodes for the
-[kubenix cluster](../kubenix-cluster). Two artifacts come out of this repository:
+[T3 Code](https://t3.codes) agent nodes for Kubernetes.
 
 - **`git.shine.town/infra/t3codes-kubenix/t3node`** — the node image, built by
   `nix/image.nix`. T3 Code's server, the agent CLIs it launches, a headless
