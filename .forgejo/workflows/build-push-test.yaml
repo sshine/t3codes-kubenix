@@ -25,8 +25,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Nix
         run: .forgejo/scripts/install-nix.sh
-      - name: Lint and render the chart
+      - name: Lint the chart
         run: nix run nixpkgs#just -- lint
+      - name: Assert the shapes it renders
+        run: nix develop --command just test-chart
       # Pushing a chart version that already exists is rejected, so bumping
       # chart/Chart.yaml is what publishes a new one.
       - name: Push chart to registry

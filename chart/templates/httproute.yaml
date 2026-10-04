@@ -1,12 +1,13 @@
 {{- $fullName := include "t3codes.fullname" . -}}
-{{- $first := true -}}
-{{- range $ordinal, $host := .Values.routes }}
-{{- if not $first }}---{{ end }}{{ $first = false }}
+{{- $routes := .Values.routes -}}
+{{- $ordinals := keys $routes | sortAlpha -}}
+{{- range $i, $ordinal := $ordinals }}
+{{- $host := index $routes $ordinal }}
 # A node reached straight from a browser, on T3 Code's own bearer auth. Nothing
-# else gates this hostname, which is the point: the client talks to a secondary
-# environment cross-origin, where it sends a bearer token and no cookies, so a
-# cookie proxy in front would redirect those calls and the browser would drop
-# them.
+# else stands in front of this hostname, which is the point: the client talks to
+# a secondary environment cross-origin, where it sends a bearer token and no
+# cookies, so a cookie proxy here would answer with a redirect that the browser
+# discards.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -25,4 +26,5 @@ spec:
     - backendRefs:
         - name: {{ $fullName }}-{{ $ordinal }}
           port: {{ $.Values.service.port }}
+{{ if lt (add1 $i) (len $ordinals) }}---{{ end }}
 {{- end }}

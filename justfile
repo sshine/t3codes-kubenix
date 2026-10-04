@@ -53,6 +53,44 @@ render *args:
 lint:
     helm lint ./chart
 
+# Assert the chart renders the shapes the cluster asks of it
+test-chart:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    fail() { echo "FAIL: $*" >&2; exit 1; }
+
+    # Counts documents rather than matching text: a separator glued to the end of
+    # the previous line yields one document where two were meant, and every grep
+    # over the text still finds what it looked for.
+    render() {
+      helm template t3node ./chart -n agentic --set fullnameOverride=t3node "$@"
+    }
+    kinds() {
+      render "$@" | yq -N '[.kind, .metadata.name] | join("/")'
+    }
+
+    three=(--set replicaCount=3 --set routes.1=a.example --set routes.2=b.example)
+
+    one=$(kinds)
+    [ "$(grep -c '^StatefulSet/' <<< "$one")" = 1 ] || fail "default values render no StatefulSet"
+    [ "$(grep -c '^Service/t3node-[0-9]' <<< "$one")" = 1 ] || fail "one replica wants one per-pod Service"
+    [ "$(grep -c '^HTTPRoute/' <<< "$one")" = 0 ] || fail "a node is published though no hostname was asked for"
+
+    many=$(kinds "${three[@]}")
+    [ "$(grep -c '^Service/t3node-[0-9]' <<< "$many")" = 3 ] || fail "three replicas want three per-pod Services"
+    [ "$(grep -c '^HTTPRoute/' <<< "$many")" = 2 ] || fail "two named ordinals want two HTTPRoutes"
+
+    # A route pointing anywhere but at its own ordinal would spread one client's
+    # WebSocket over databases that know nothing of each other.
+    stray=$(render "${three[@]}" | yq -N \
+        'select(.kind == "HTTPRoute")
+         | select(.spec.rules[].backendRefs[].name != .metadata.name)
+         | .metadata.name')
+    [ -z "$stray" ] || fail "HTTPRoute $stray names a backend that is not its own node"
+
+    echo "chart renders ok"
+
 # Assert the image carries what a node relies on, without a container runtime
 test-image: build
     #!/usr/bin/env bash
@@ -116,5 +154,5 @@ test-image: build
     echo "image contents ok"
 
 # Every flake check
-check: fmt-check lint
+check: fmt-check lint test-chart
     nix flake check -L

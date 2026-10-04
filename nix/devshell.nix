@@ -10,6 +10,7 @@
         pkgs.just
         pkgs.skopeo
         pkgs.kubernetes-helm
+        pkgs.yq-go
         pkgs.kubectl
       ];
     };
