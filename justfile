@@ -41,6 +41,12 @@ push: build
 push-chart:
     #!/usr/bin/env bash
     set -euo pipefail
+    # REGISTRY_PASSWORD is consumed when set; absent means the ambient auth in
+    # helm's own registry config, which is what a push by hand uses. helm push
+    # takes no credential flags, so a login has to happen first either way.
+    if [ -n "${REGISTRY_PASSWORD:-}" ]; then
+      helm registry login git.shine.town -u forgejo_admin -p "$REGISTRY_PASSWORD"
+    fi
     out=$(mktemp -d)
     trap 'rm -rf "$out"' EXIT
     helm package chart -d "$out"

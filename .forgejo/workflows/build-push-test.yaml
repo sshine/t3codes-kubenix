@@ -4,6 +4,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+# Every recipe reaches for helm, skopeo or yq, so they all run inside the
+# devshell. `nix run nixpkgs#just` supplies just and nothing else, which is a
+# failure the image job only reaches after building two gigabytes.
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -12,13 +15,13 @@ jobs:
       - name: Install Nix
         run: .forgejo/scripts/install-nix.sh
       - name: Build node image
-        run: nix run nixpkgs#just -- build
+        run: nix develop --command just build
       - name: Assert the image contents
-        run: nix run nixpkgs#just -- test-image
+        run: nix develop --command just test-image
       - name: Push image to registry
         env:
           SKOPEO_DEST_CREDS: forgejo_admin:${{ secrets.T3CODES_PACKAGE_UPLOAD_KEY }}
-        run: nix run nixpkgs#just -- push
+        run: nix develop --command just push
   chart:
     runs-on: ubuntu-latest
     steps:
@@ -26,16 +29,12 @@ jobs:
       - name: Install Nix
         run: .forgejo/scripts/install-nix.sh
       - name: Lint the chart
-        run: nix run nixpkgs#just -- lint
+        run: nix develop --command just lint
       - name: Assert the shapes it renders
         run: nix develop --command just test-chart
       # Pushing a chart version that already exists is rejected, so bumping
       # chart/Chart.yaml is what publishes a new one.
       - name: Push chart to registry
         env:
-          HELM_REGISTRY_CONFIG: /dev/null
           REGISTRY_PASSWORD: ${{ secrets.T3CODES_PACKAGE_UPLOAD_KEY }}
-        run: |
-          nix shell nixpkgs#kubernetes-helm -c \
-            helm registry login git.shine.town -u forgejo_admin -p "$REGISTRY_PASSWORD"
-          nix run nixpkgs#just -- push-chart
+        run: nix develop --command just push-chart
