@@ -1,0 +1,39 @@
+name: Build, push and test the node image
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        run: .forgejo/scripts/install-nix.sh
+      - name: Build node image
+        run: nix run nixpkgs#just -- build
+      - name: Assert the image contents
+        run: nix run nixpkgs#just -- test-image
+      - name: Push image to registry
+        env:
+          SKOPEO_DEST_CREDS: forgejo_admin:${{ secrets.T3CODES_PACKAGE_UPLOAD_KEY }}
+        run: nix run nixpkgs#just -- push
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        run: .forgejo/scripts/install-nix.sh
+      - name: Lint and render the chart
+        run: nix run nixpkgs#just -- lint
+      # Pushing a chart version that already exists is rejected, so bumping
+      # chart/Chart.yaml is what publishes a new one.
+      - name: Push chart to registry
+        env:
+          HELM_REGISTRY_CONFIG: /dev/null
+          REGISTRY_PASSWORD: ${{ secrets.T3CODES_PACKAGE_UPLOAD_KEY }}
+        run: |
+          nix shell nixpkgs#kubernetes-helm -c \
+            helm registry login git.shine.town -u forgejo_admin -p "$REGISTRY_PASSWORD"
+          nix run nixpkgs#just -- push-chart
