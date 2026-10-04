@@ -51,6 +51,16 @@ push-chart:
     if [ -n "${REGISTRY_PASSWORD:-}" ]; then
       helm registry login git.shine.town -u forgejo_admin -p "$REGISTRY_PASSWORD"
     fi
+
+    # The registry refuses a version it already holds, and most commits here
+    # change the image rather than the chart. Without this the chart job fails
+    # on every push that leaves Chart.yaml alone, which trains you to ignore it.
+    version=$(yq '.version' chart/Chart.yaml)
+    if helm show chart {{charts}}/t3codes --version "$version" >/dev/null 2>&1; then
+      echo "t3codes $version is already published; bump chart/Chart.yaml to publish a new one."
+      exit 0
+    fi
+
     out=$(mktemp -d)
     trap 'rm -rf "$out"' EXIT
     helm package chart -d "$out"
