@@ -1,0 +1,40 @@
+{{- $fullName := include "t3codes.fullname" . -}}
+# The governing Service. It exists so the StatefulSet's pods get stable DNS; it
+# is deliberately not a route target, because a round of requests spread over
+# three pods would be three unrelated databases answering.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-headless
+  labels:
+    {{- include "t3codes.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "t3codes.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+---
+{{- range $i := until (int .Values.replicaCount) }}
+# One Service per pod, selecting that pod alone, so a route or a proxy can name
+# a single node. The pod-name label is set by the StatefulSet controller.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-{{ $i }}
+  labels:
+    {{- include "t3codes.labels" $ | nindent 4 }}
+    t3codes.shine.town/ordinal: {{ $i | quote }}
+spec:
+  selector:
+    {{- include "t3codes.selectorLabels" $ | nindent 4 }}
+    statefulset.kubernetes.io/pod-name: {{ $fullName }}-{{ $i }}
+  ports:
+    - name: http
+      port: {{ $.Values.service.port }}
+      targetPort: http
+{{ if lt (add1 $i) (int $.Values.replicaCount) }}---{{ end }}
+{{- end }}

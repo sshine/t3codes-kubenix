@@ -1,0 +1,9 @@
+apiVersion: v2
+name: t3codes
+description: T3 Code agent nodes, each with its own Nix store, workspace and identity
+type: application
+version: 0.1.0
+appVersion: "0.0.45"
+home: https://t3.codes
+sources:
+  - https://git.shine.town/infra/t3codes-kubenix

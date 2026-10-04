@@ -1,0 +1,69 @@
+# One agent node per replica. Each owns its state, so they are peers rather than
+# copies: a client lists them side by side and picks one per thread.
+replicaCount: 1
+image:
+  repository: git.shine.town/infra/t3codes-kubenix/t3node
+  # Empty means the chart's appVersion. Pin a real tag in a cluster: rolling a
+  # node restarts whatever its agents were doing.
+  tag: ""
+  pullPolicy: IfNotPresent
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: true
+  name: ""
+service:
+  port: 3773
+persistence:
+  storageClass: hcloud-volumes
+  accessModes:
+    - ReadWriteOnce
+  # Holds the seeded Nix store (around 3Gi), everything an agent builds on top
+  # of it, the agent sign-ins and threads, and the repositories.
+  size: 50Gi
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 6Gi
+# Chromium needs more than the 64Mi a container gets by default.
+shm:
+  sizeLimit: 1Gi
+# The image's entrypoint starts as uid 1000 and never needs root; fsGroup is
+# what makes the volume writable to it.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+# One node per machine, so three agents building at once do not contend for one
+# machine's CPU while two sit idle.
+spreadAcrossNodes: true
+# Each pod seeds a few gigabytes onto its own volume before it starts, and they
+# have no reason to wait for each other.
+podManagementPolicy: Parallel
+# Long enough for an agent mid-turn to be told to stop.
+terminationGracePeriodSeconds: 60
+env: []
+envFrom: []
+nodeSelector: {}
+tolerations: []
+gateway:
+  name: main
+  namespace: gateway
+  sectionName: https
+# A public hostname per pod ordinal, as "<ordinal>": <hostname>. A browser talks
+# to every environment it is connected to directly, so a node a browser should
+# reach needs a name of its own; one left out here is reachable only in-cluster,
+# which is what to do for a node that something else already fronts.
+#
+# Ordinals are zero-based, so t3node-0 is "0".
+routes: {}
