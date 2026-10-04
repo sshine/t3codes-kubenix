@@ -15,14 +15,18 @@ fmt-check:
 build:
     nix build .#image -o t3node.tar.gz
 
-# The tag an image built from the current flake.lock carries
+# The tag an image built from the current tree carries
 tag:
     #!/usr/bin/env bash
     set -euo pipefail
+    # The commit is part of the tag because t3's version and the nixpkgs date
+    # say nothing about this repo: a change to image.nix or serve.bash would
+    # otherwise rewrite an existing tag with different contents, and no pod
+    # pinned to it would roll.
     t3=$(nix eval --raw .#t3code.version)
     last_modified=$(nix eval --impure --expr \
       '(builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked.lastModified')
-    printf '%s-%s\n' "$t3" "$(date -u -d "@${last_modified}" +%Y%m%d)"
+    printf '%s-%s-%s\n' "$t3" "$(date -u -d "@${last_modified}" +%Y%m%d)" "$(git rev-parse --short HEAD)"
 
 # Push the image as :latest and as :<t3-version>-<nixpkgs-date>
 push: build
@@ -138,7 +142,7 @@ test-image: build
     # the image it is about to run.
     grep -qxF './.nix-store-stamp' "$names" || fail "no /.nix-store-stamp in the image"
 
-    for tool in t3 t3-serve seed-nix claude codex opencode playwright git gh nix node bash; do
+    for tool in t3 t3-serve seed-nix claude codex opencode playwright git gh fj nix node bash; do
       # /bin is a tree of symlinks, so the entry reads "./bin/x -> /nix/store/...".
       target=$(sed -n "s|^l.* \./bin/$tool -> ||p" "$listing" | head -1)
       [ -n "$target" ] || fail "$tool missing from /bin"

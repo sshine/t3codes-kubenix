@@ -42,7 +42,13 @@
 
         git
         git-lfs
+
+        # T3 Code reads source-control logins out of each forge's own CLI rather
+        # than holding credentials itself, so the CLI is what makes a forge
+        # usable. tea would cover Forgejo too, but nixpkgs has 0.15 and the
+        # integration wants 0.16 or newer.
         gh
+        forgejo-cli
         openssh
         curl
         cacert
